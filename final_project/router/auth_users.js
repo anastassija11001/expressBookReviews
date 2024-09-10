@@ -10,19 +10,64 @@ const isValid = (username)=>{ //returns boolean
 }
 
 const authenticatedUser = (username,password)=>{ //returns boolean
-//write code to check if username and password match the one we have in records.
 }
 
-//only registered users can login
-regd_users.post("/login", (req,res) => {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
+regd_users.post("/login/:username/:password", (req,res) => {
+  const { username, password } = req.params;
+
+  if (!username || !password) {
+    return res
+      .status(400)
+      .json({ message: "Требуются имя пользователя и пароль" });
+  }
+
+  if (!isValid(username)) {
+    return res.status(401).json({ message: "Неверное имя пользователя или пароль" });
+  }
+
+  if (!authenticatedUser(username, password)) {
+    return res.status(401).json({ message: "Неверное имя пользователя или пароль" });
+  }
+
+  const token = jwt.sign({ username }, secretKey, { expiresIn: "1h" });
+
+  res.status(200).json({ message: "Пользователь успешно вошел в систему!", token });
 });
 
 // Add a book review
 regd_users.put("/auth/review/:isbn", (req, res) => {
   //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
+  const isbn = req.params.isbn;
+  const review = req.query.review; 
+  const token =
+    req.headers["authorization"] && req.headers["authorization"].split(" ")[1]; // Get the token from the header
+
+  if (!token) {
+    return res.status(403).json({ message: "Токен не предоставлен" });
+  }
+
+  jwt.verify(token, secretKey, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: "Не удалось аутентифицировать токен" });
+    }
+
+    const username = decoded.username; 
+
+    if (!review) {
+      return res.status(400).json({ message: "Требуется обзор" });
+    }
+
+    if (!books[isbn].reviews) {
+      books[isbn].reviews = {};
+    }
+
+    books[isbn].reviews[username] = review;
+
+    return res.status(200).json({
+      message: `Добавлен/обновлен обзор книги с ISBN: ${isbn}`,
+      reviews: books[isbn].reviews,
+    });
+  });
 });
 
 module.exports.authenticated = regd_users;
